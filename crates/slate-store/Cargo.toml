@@ -1,0 +1,10 @@
+[package]
+name = "slate-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
+thiserror = "2"
+zstd = "0.13"

@@ -1,0 +1,13 @@
+[package]
+name = "slate-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "slate"
+path = "src/main.rs"
+
+[dependencies]
+slate-store = { path = "../slate-store" }
+gpui-kit = "0.7"
