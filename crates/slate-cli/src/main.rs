@@ -110,11 +110,15 @@ async fn main() {
                 println!("{} {:<24.24} {}", if r.unread { "*" } else { " " }, r.from_name, r.subject);
             }
         }
+        Some("open") => {
+            let Some(id) = args.next() else { return eprintln!("usage: slate-cli open <message-id>") };
+            open_message(&id).await;
+        }
         Some("tiers") => {
             let n: usize = args.next().and_then(|a| a.parse().ok()).unwrap_or(100);
             tiers(n).await;
         }
-        _ => eprintln!("usage: slate-cli login | sync [limit] | list [n] | tiers [n]"),
+        _ => eprintln!("usage: slate-cli login | sync [limit] | list [n] | tiers [n] | open <id>"),
     }
 }
 
@@ -180,4 +184,23 @@ async fn tiers(n: usize) {
         println!("  {r:<18} {k:>4}");
     }
     println!("  (messages with exactly one reason: {only_reason}; other tags outside the native set also count)");
+}
+
+/// Fetch one message in full and show it in the sandboxed `slate-view` window.
+async fn open_message(id: &str) {
+    use std::io::Write;
+    let c = client().await;
+    let m = c.get_raw(id).await.expect("fetch message");
+    let raw = m.raw.and_then(|r| B64.decode(r.trim_end_matches('=')).ok()).expect("no raw body");
+    let p = slate_mime::parse(&raw).expect("unparseable message");
+    let html = slate_mime::body_for_view(&p);
+    let exe_dir = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.to_path_buf()));
+    let viewer = exe_dir.map(|d| d.join("slate-view")).filter(|p| p.exists()).unwrap_or_else(|| "slate-view".into());
+    let mut child = std::process::Command::new(viewer)
+        .args(["--title", &p.subject])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .expect("start slate-view (build it with `cargo build -p slate-view`)");
+    child.stdin.take().unwrap().write_all(html.as_bytes()).unwrap();
+    child.wait().ok();
 }

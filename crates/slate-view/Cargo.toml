@@ -1,0 +1,14 @@
+[package]
+name = "slate-view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "slate-view"
+path = "src/main.rs"
+
+[dependencies]
+slate-mime = { path = "../slate-mime" }
+wry = "0.57"
+tao = "0.37"

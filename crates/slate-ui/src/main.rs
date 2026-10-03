@@ -32,8 +32,11 @@ impl Render for ThreadList {
             range
                 .map(|i| {
                     let r = &this.rows[i];
+                    let id = r.id.clone();
                     div()
                         .id(i)
+                        .cursor_pointer()
+                        .on_click(move |_, _, _| open_message(&id))
                         .v_flex()
                         .w(this.width)
                         .h(px(ROW_H))
@@ -55,6 +58,18 @@ impl Render for ThreadList {
                 })
                 .collect()
         }))
+    }
+}
+
+/// Open a message in the sandboxed viewer by running `slate-cli open <id>`
+/// (built next to this binary by `cargo build`).
+fn open_message(id: &str) {
+    let cli = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("slate-cli"))).filter(|p| p.exists());
+    match cli {
+        Some(cli) => {
+            let _ = std::process::Command::new(cli).args(["open", id]).spawn();
+        }
+        None => eprintln!("slate-cli not found next to slate; run `cargo build` for the whole workspace"),
     }
 }
 

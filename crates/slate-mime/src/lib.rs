@@ -38,6 +38,47 @@ pub fn sanitize(html: &str) -> String {
     b.clean(html).to_string()
 }
 
+/// Content-Security-Policy for the message webview: no scripts, no network,
+/// inline CSS allowed, images only from the message itself (data:/cid:).
+/// Remote images stay blocked until the user opts in (a later toggle).
+pub const WEBVIEW_CSP: &str = "default-src 'none'; style-src 'unsafe-inline'; img-src data: cid:; font-src data:; base-uri 'none'; form-action 'none'";
+
+/// Sanitize for the webview. Unlike `sanitize`, this keeps layout (tables,
+/// style blocks, inline CSS, images) because the webview is where complex
+/// mail renders; scripts, handlers, forms, frames and embeds are removed and
+/// the CSP above blocks anything network-bound.
+pub fn sanitize_for_webview(html: &str) -> String {
+    let mut b = ammonia::Builder::default();
+    b.add_tags(["style", "center", "font"]);
+    b.rm_clean_content_tags(["style"]);
+    b.rm_tags(["form", "input", "button", "iframe", "object", "embed", "link", "script", "base", "meta"]);
+    b.add_generic_attributes(["style", "class", "align", "valign", "width", "height", "bgcolor", "border", "cellpadding", "cellspacing", "color", "face", "size", "dir"]);
+    b.add_url_schemes(["data", "cid"]);
+    b.link_rel(Some("noopener noreferrer"));
+    b.clean(html).to_string()
+}
+
+/// A complete document for the webview: CSP first, then the sanitized body.
+pub fn webview_document(html: &str) -> String {
+    format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\"><meta http-equiv=\"Content-Security-Policy\" content=\"{WEBVIEW_CSP}\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>body{{margin:16px;font:15px/1.5 system-ui,sans-serif;word-wrap:break-word}}img{{max-width:100%;height:auto}}</style></head><body>{}</body></html>",
+        sanitize_for_webview(html)
+    )
+}
+
+/// HTML to hand to the webview for a parsed message: its HTML part when it
+/// has one, otherwise its plain text escaped into a wrapped `<pre>`.
+pub fn body_for_view(p: &Parsed) -> String {
+    match (&p.html, &p.text) {
+        (Some(h), _) => h.clone(),
+        (None, Some(t)) => {
+            let esc = t.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+            format!("<pre style=\"white-space:pre-wrap;font:inherit\">{esc}</pre>")
+        }
+        (None, None) => String::from("<p>(no content)</p>"),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tier {
     /// Plain text or no HTML: render as native text.
@@ -110,6 +151,33 @@ mod tests {
         let out = sanitize(r#"<p onclick="x()">Hi</p><script>alert(1)</script><img src="http://t.example/p.gif"><a href="https://a.example">l</a>"#);
         assert!(!out.contains("script") && !out.contains("onclick") && !out.contains("<img"));
         assert!(out.contains("<a ") && out.contains("Hi"));
+    }
+
+    #[test]
+    fn webview_sanitize_keeps_layout_drops_active_content() {
+        let out = sanitize_for_webview(
+            r##"<style>td{color:red}</style><table width="600" bgcolor="#fff"><tr><td style="padding:4px" onclick="x()">Hi</td></tr></table><script>alert(1)</script><iframe src="https://e.example"></iframe><form action="/x"><input></form><img src="data:image/png;base64,AAAA"><a href="javascript:alert(1)">bad</a>"##,
+        );
+        assert!(out.contains("<table") && out.contains("padding:4px") && out.contains("td{color:red}") && out.contains("<img"));
+        for banned in ["<script", "onclick", "<iframe", "<form", "<input", "javascript:"] {
+            assert!(!out.contains(banned), "{banned} survived: {out}");
+        }
+    }
+
+    #[test]
+    fn webview_document_carries_csp() {
+        let d = webview_document("<p>x</p>");
+        assert!(d.contains("Content-Security-Policy") && d.contains("default-src 'none'") && d.contains("<p>x</p>"));
+    }
+
+    #[test]
+    fn body_for_view_prefers_html_and_escapes_text() {
+        let mut p = parse(SIMPLE).unwrap();
+        p.html = None;
+        p.text = Some("a < b & c".into());
+        assert!(body_for_view(&p).contains("a &lt; b &amp; c"));
+        p.html = Some("<p>h</p>".into());
+        assert_eq!(body_for_view(&p), "<p>h</p>");
     }
 
     #[test]
