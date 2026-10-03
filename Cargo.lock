@@ -6614,6 +6614,7 @@ dependencies = [
  "serde",
  "serde_json",
  "slate-gmail",
+ "slate-mime",
  "slate-store",
  "slate-sync",
  "tokio",

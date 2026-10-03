@@ -26,6 +26,7 @@ Create a Google OAuth *Desktop app* client (Gmail API enabled, your account adde
     cargo run -p slate-cli -- login              # opens the browser, saves a refresh token (0600)
     cargo run -p slate-cli -- sync               # newest 2000 inbox messages, then incremental on re-run
     cargo run -p slate-cli -- list 20
+    cargo run -p slate-cli -- tiers 200          # how much of your mail needs the webview (counts only)
     cargo run -p slate-ui                        # window reads the synced mailbox
 
 ## Run

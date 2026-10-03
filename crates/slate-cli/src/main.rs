@@ -110,6 +110,40 @@ async fn main() {
                 println!("{} {:<24.24} {}", if r.unread { "*" } else { " " }, r.from_name, r.subject);
             }
         }
-        _ => eprintln!("usage: slate-cli login | sync [limit] | list [n]"),
+        Some("tiers") => {
+            let n: usize = args.next().and_then(|a| a.parse().ok()).unwrap_or(100);
+            tiers(n).await;
+        }
+        _ => eprintln!("usage: slate-cli login | sync [limit] | list [n] | tiers [n]"),
     }
+}
+
+/// M0 measurement: fetch the newest `n` inbox messages in full and report what
+/// share each render tier would handle. Nothing is stored or printed from the
+/// message bodies, only the counts.
+async fn tiers(n: usize) {
+    use slate_mime::{Tier, classify, parse};
+    let c = client().await;
+    let rows = open_store().page("INBOX", None, n).expect("query");
+    let mut set = tokio::task::JoinSet::new();
+    let mut counts = [0usize; 3];
+    let mut total = 0;
+    let mut it = rows.into_iter();
+    loop {
+        while set.len() < 16 {
+            let Some(r) = it.next() else { break };
+            let c = c.clone();
+            set.spawn(async move { c.get_raw(&r.id).await });
+        }
+        let Some(res) = set.join_next().await else { break };
+        let Ok(Ok(m)) = res else { continue };
+        let Some(raw) = m.raw.and_then(|r| B64.decode(r).ok()) else { continue };
+        let Some(p) = parse(&raw) else { continue };
+        counts[match classify(p.html.as_deref()) { Tier::Text => 0, Tier::Native => 1, Tier::Webview => 2 }] += 1;
+        total += 1;
+    }
+    for (name, k) in ["Text (native)", "Simple HTML (native)", "Complex HTML (webview)"].iter().zip(counts) {
+        println!("{name:<24} {k:>4}  {:>5.1}%", 100.0 * k as f64 / total.max(1) as f64);
+    }
+    println!("messages measured: {total}");
 }
