@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/slate-store", "crates/slate-mime", "crates/slate-gmail", "crates/slate-ui"]
+members = ["crates/slate-sync", "crates/slate-cli", "crates/slate-store", "crates/slate-mime", "crates/slate-gmail", "crates/slate-ui"]
 
 [workspace.package]
 version = "0.0.1"

@@ -1,0 +1,15 @@
+[package]
+name = "slate-sync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+slate-gmail = { path = "../slate-gmail" }
+slate-store = { path = "../slate-store" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+thiserror = "2"
+
+[dev-dependencies]
+wiremock = "0.6"
+serde_json = "1"

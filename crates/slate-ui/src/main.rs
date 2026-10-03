@@ -90,8 +90,20 @@ fn seed_demo(store: &mut Store) {
     }
 }
 
+fn db_path() -> String {
+    if let Ok(p) = std::env::var("SLATE_DB") {
+        return p;
+    }
+    // Prefer the mailbox `slate-cli sync` fills; otherwise fall back to the demo store.
+    let real = std::env::var("HOME").ok().map(|h| std::path::PathBuf::from(h).join(".local/share/slate/slate.db"));
+    match real {
+        Some(p) if p.exists() => p.to_string_lossy().into(),
+        _ => std::env::temp_dir().join("slate-demo.db").to_string_lossy().into(),
+    }
+}
+
 fn main() {
-    let path = std::env::var("SLATE_DB").unwrap_or_else(|_| std::env::temp_dir().join("slate-demo.db").to_string_lossy().into());
+    let path = db_path();
     let mut store = Store::open(&path).expect("open store");
     if store.count("INBOX").unwrap_or(0) == 0 {
         seed_demo(&mut store);

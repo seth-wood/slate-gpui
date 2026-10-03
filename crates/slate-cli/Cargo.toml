@@ -1,0 +1,19 @@
+[package]
+name = "slate-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "slate-cli"
+path = "src/main.rs"
+
+[dependencies]
+slate-gmail = { path = "../slate-gmail" }
+slate-store = { path = "../slate-store" }
+slate-sync = { path = "../slate-sync" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.9"
+base64 = "0.22"

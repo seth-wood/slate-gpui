@@ -6606,6 +6606,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
+name = "slate-cli"
+version = "0.0.1"
+dependencies = [
+ "base64 0.22.1",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "slate-gmail",
+ "slate-store",
+ "slate-sync",
+ "tokio",
+]
+
+[[package]]
 name = "slate-gmail"
 version = "0.0.1"
 dependencies = [
@@ -6636,6 +6650,18 @@ dependencies = [
  "rusqlite",
  "thiserror 2.0.21",
  "zstd",
+]
+
+[[package]]
+name = "slate-sync"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+ "slate-gmail",
+ "slate-store",
+ "thiserror 2.0.21",
+ "tokio",
+ "wiremock",
 ]
 
 [[package]]

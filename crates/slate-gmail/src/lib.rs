@@ -22,6 +22,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub const DEFAULT_BASE: &str = "https://gmail.googleapis.com/gmail/v1/users/me";
 
+#[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
     base: String,
