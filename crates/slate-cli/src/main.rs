@@ -154,7 +154,7 @@ async fn tiers(n: usize) {
                 continue;
             }
         };
-        let Some(p) = m.raw.and_then(|r| B64.decode(r).ok()).and_then(|raw| parse(&raw)) else {
+        let Some(p) = m.raw.and_then(|r| B64.decode(r.trim_end_matches('=')).ok()).and_then(|raw| parse(&raw)) else {
             parse_err += 1;
             continue;
         };
