@@ -122,12 +122,16 @@ async fn main() {
 /// share each render tier would handle. Nothing is stored or printed from the
 /// message bodies, only the counts.
 async fn tiers(n: usize) {
-    use slate_mime::{Tier, classify, parse};
+    use slate_mime::{Tier, classify, parse, webview_reasons};
+    use std::collections::BTreeMap;
     let c = client().await;
     let rows = open_store().page("INBOX", None, n).expect("query");
     let mut set = tokio::task::JoinSet::new();
     let mut counts = [0usize; 3];
     let mut total = 0;
+    let (mut fetch_err, mut parse_err, mut only_reason): (usize, usize, usize) = (0, 0, 0);
+    let mut reasons: BTreeMap<&str, usize> = BTreeMap::new();
+    let requested = rows.len();
     let mut it = rows.into_iter();
     loop {
         while set.len() < 16 {
@@ -136,14 +140,44 @@ async fn tiers(n: usize) {
             set.spawn(async move { c.get_raw(&r.id).await });
         }
         let Some(res) = set.join_next().await else { break };
-        let Ok(Ok(m)) = res else { continue };
-        let Some(raw) = m.raw.and_then(|r| B64.decode(r).ok()) else { continue };
-        let Some(p) = parse(&raw) else { continue };
-        counts[match classify(p.html.as_deref()) { Tier::Text => 0, Tier::Native => 1, Tier::Webview => 2 }] += 1;
+        let m = match res {
+            Ok(Ok(m)) => m,
+            Ok(Err(e)) => {
+                if fetch_err == 0 {
+                    eprintln!("first fetch error: {e}");
+                }
+                fetch_err += 1;
+                continue;
+            }
+            Err(_) => {
+                fetch_err += 1;
+                continue;
+            }
+        };
+        let Some(p) = m.raw.and_then(|r| B64.decode(r).ok()).and_then(|raw| parse(&raw)) else {
+            parse_err += 1;
+            continue;
+        };
+        let tier = classify(p.html.as_deref());
+        counts[match tier { Tier::Text => 0, Tier::Native => 1, Tier::Webview => 2 }] += 1;
+        if tier == Tier::Webview {
+            let rs = p.html.as_deref().map(webview_reasons).unwrap_or_default();
+            if rs.len() == 1 {
+                only_reason += 1;
+            }
+            for r in rs {
+                *reasons.entry(r).or_default() += 1;
+            }
+        }
         total += 1;
     }
     for (name, k) in ["Text (native)", "Simple HTML (native)", "Complex HTML (webview)"].iter().zip(counts) {
         println!("{name:<24} {k:>4}  {:>5.1}%", 100.0 * k as f64 / total.max(1) as f64);
     }
-    println!("messages measured: {total}");
+    println!("messages measured: {total} of {requested} ({fetch_err} fetch errors, {parse_err} unparseable)");
+    println!("\nWhy messages need the webview (a message can have several reasons):");
+    for (r, k) in &reasons {
+        println!("  {r:<18} {k:>4}");
+    }
+    println!("  (messages with exactly one reason: {only_reason}; other tags outside the native set also count)");
 }

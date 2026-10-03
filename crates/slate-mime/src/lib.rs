@@ -70,6 +70,25 @@ pub fn classify(html: Option<&str>) -> Tier {
     Tier::Native
 }
 
+/// Why an HTML body needs the webview: which layout signals it contains.
+/// Used by the M0 measurement to see what actually drives the webview share.
+pub fn webview_reasons(html: &str) -> Vec<&'static str> {
+    let l = html.to_ascii_lowercase();
+    let mut out = Vec::new();
+    for (name, pats) in [
+        ("table layout", &["<table", "cellpadding"][..]),
+        ("style block", &["<style"][..]),
+        ("images", &["<img"][..]),
+        ("font/center tags", &["<font", "<center"][..]),
+        ("css positioning", &["float:", "position:", "background-image"][..]),
+    ] {
+        if pats.iter().any(|p| l.contains(p)) {
+            out.push(name);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -91,6 +110,12 @@ mod tests {
         let out = sanitize(r#"<p onclick="x()">Hi</p><script>alert(1)</script><img src="http://t.example/p.gif"><a href="https://a.example">l</a>"#);
         assert!(!out.contains("script") && !out.contains("onclick") && !out.contains("<img"));
         assert!(out.contains("<a ") && out.contains("Hi"));
+    }
+
+    #[test]
+    fn reasons_list_signals() {
+        assert_eq!(webview_reasons("<table><img src=a></table>"), ["table layout", "images"]);
+        assert!(webview_reasons("<p>hi</p>").is_empty());
     }
 
     #[test]
